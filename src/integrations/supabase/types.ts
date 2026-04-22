@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      orders: {
+        Row: {
+          amount_due: number
+          coin: string
+          confirmations: number
+          created_at: string
+          deposit_address: string
+          expires_at: string
+          fee: number
+          id: string
+          merchant: string
+          network: string
+          order_number: string
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          tx_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount_due: number
+          coin: string
+          confirmations?: number
+          created_at?: string
+          deposit_address: string
+          expires_at: string
+          fee: number
+          id?: string
+          merchant?: string
+          network: string
+          order_number: string
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount_due?: number
+          coin?: string
+          confirmations?: number
+          created_at?: string
+          deposit_address?: string
+          expires_at?: string
+          fee?: number
+          id?: string
+          merchant?: string
+          network?: string
+          order_number?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          tx_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +76,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      order_status: "Pending" | "Process" | "Paid" | "Expired"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +203,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      order_status: ["Pending", "Process", "Paid", "Expired"],
+    },
   },
 } as const
