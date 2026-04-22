@@ -129,7 +129,7 @@ const Deposit = () => {
 
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-white rounded-2xl shadow-glow">
-                <QRCodeSVG value={DEMO_ADDRESS} size={180} level="M" />
+                <QRCodeImage value={DEMO_ADDRESS} size={180} />
               </div>
             </div>
 
