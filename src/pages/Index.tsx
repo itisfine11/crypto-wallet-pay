@@ -3,16 +3,53 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaymentModal } from "@/components/PaymentModal";
-import { generateOrder, type Coin, type Network } from "@/lib/payment-data";
+import { generateOrder, WALLETS, DEMO_ADDRESS, type Coin, type Network } from "@/lib/payment-data";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Index = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
   const order = useMemo(() => generateOrder(), []);
 
-  const handleProceed = (coin: Coin, network: Network) => {
+  const handleProceed = async (coin: Coin, network: Network) => {
+    setCreating(true);
+    const depositAddress = WALLETS[network] ?? DEMO_ADDRESS;
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+    const { data, error } = await supabase
+      .from("orders")
+      .insert({
+        order_number: order.orderNumber,
+        merchant: order.merchant,
+        coin,
+        network,
+        deposit_address: depositAddress,
+        subtotal: order.subtotal,
+        fee: order.fee,
+        amount_due: order.amountDue,
+        expires_at: expiresAt,
+      })
+      .select()
+      .single();
+
+    setCreating(false);
+
+    if (error || !data) {
+      toast.error("Failed to create order", { description: error?.message });
+      return;
+    }
+
     setOpen(false);
-    navigate("/deposit", { state: { coin, network, order } });
+    navigate("/deposit", {
+      state: {
+        coin,
+        network,
+        order: { ...order, id: data.id },
+        depositAddress,
+      },
+    });
   };
 
   return (
@@ -31,7 +68,7 @@ const Index = () => {
 
         <div className="bg-gradient-card border border-border rounded-2xl p-6 shadow-card mb-6 text-left">
           <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Amount Due</p>
-          <p className="text-4xl font-bold text-primary">${order.amountDue.toFixed(2)}</p>
+          <p className="text-4xl font-bold text-primary">${order.amountDue.toFixed(6)}</p>
           <p className="text-xs text-muted-foreground mt-1">Order {order.orderNumber}</p>
         </div>
 
@@ -53,7 +90,12 @@ const Index = () => {
         </div>
       </div>
 
-      <PaymentModal open={open} onOpenChange={setOpen} order={order} onProceed={handleProceed} />
+      <PaymentModal
+        open={open}
+        onOpenChange={(v) => !creating && setOpen(v)}
+        order={order}
+        onProceed={handleProceed}
+      />
     </main>
   );
 };
