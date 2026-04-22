@@ -14,7 +14,8 @@ type Props = {
 };
 
 const Row = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
-  <div className="flex justify-between items-center py-2 text-sm">
+const Row = ({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) => (
+  <div className="flex justify-between items-center py-2 text-sm gap-3">
     <span className="text-muted-foreground">{label}</span>
     <span className={accent ? "font-bold text-primary text-base" : "font-medium text-foreground"}>{value}</span>
   </div>
