@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { type Coin, type Network, type OrderInfo } from "@/lib/payment-data";
 import { CoinNetworkIcon } from "./CoinIcon";
 import { CoinNetworkModal } from "./CoinNetworkModal";
+import { StatusBadge } from "./StatusBadge";
 
 type Props = {
   open: boolean;
@@ -13,8 +14,8 @@ type Props = {
   onProceed: (coin: Coin, network: Network) => void;
 };
 
-const Row = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
-  <div className="flex justify-between items-center py-2 text-sm">
+const Row = ({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) => (
+  <div className="flex justify-between items-center py-2 text-sm gap-3">
     <span className="text-muted-foreground">{label}</span>
     <span className={accent ? "font-bold text-primary text-base" : "font-medium text-foreground"}>{value}</span>
   </div>
@@ -61,7 +62,7 @@ export const PaymentModal = ({ open, onOpenChange, order, onProceed }: Props) =>
             <div className="rounded-xl bg-secondary/40 border border-border p-4 divide-y divide-border">
               <Row label="Order Number" value={order.orderNumber} />
               <Row label="Merchant" value={order.merchant} />
-              <Row label="Status" value={order.status} />
+              <Row label="Status" value={<StatusBadge status={order.status} />} />
               <Row label="Subtotal" value={`$${order.subtotal.toFixed(2)}`} />
               <Row label="Fee" value={`$${order.fee.toFixed(2)}`} />
               <Row label="Amount Due" value={`$${order.amountDue.toFixed(2)}`} accent />
