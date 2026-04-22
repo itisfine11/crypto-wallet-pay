@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeImage } from "@/components/QRCodeImage";
 import { ArrowLeft, Copy, Check, Clock, Info, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -129,7 +129,7 @@ const Deposit = () => {
 
             <div className="flex justify-center mb-4">
               <div className="p-4 bg-white rounded-2xl shadow-glow">
-                <QRCodeSVG value={DEMO_ADDRESS} size={180} level="M" />
+                <QRCodeImage value={DEMO_ADDRESS} size={180} />
               </div>
             </div>
 
