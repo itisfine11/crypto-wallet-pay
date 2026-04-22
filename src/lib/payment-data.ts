@@ -15,10 +15,12 @@ export const NETWORKS: { id: Network; name: string; short: string; color: string
 
 export const DEMO_ADDRESS = "0x7F4e8B2c6A1d5E9F3B8c2D4a6E1f9B3c5D7e8A2b";
 
+export type OrderStatus = "Pending" | "Process" | "Paid";
+
 export type OrderInfo = {
   orderNumber: string;
   merchant: string;
-  status: "Pending" | "Awaiting Payment" | "Paid" | "Expired";
+  status: OrderStatus;
   subtotal: number;
   fee: number;
   amountDue: number;
@@ -36,9 +38,10 @@ export function generateOrder(): OrderInfo {
   return {
     orderNumber,
     merchant: "Lovable Crypto Store",
-    status: "Awaiting Payment",
+    status: "Pending",
     subtotal,
     fee,
     amountDue,
   };
 }
+
