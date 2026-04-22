@@ -7,10 +7,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { CoinNetworkIcon } from "@/components/CoinIcon";
 import { DEMO_ADDRESS, type Coin, type Network, type OrderInfo, COINS } from "@/lib/payment-data";
+import { StatusBadge } from "@/components/StatusBadge";
 
 const DEADLINE_SECONDS = 10 * 60;
 
-const Row = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
+const Row = ({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) => (
   <div className="flex justify-between items-center py-2 text-sm">
     <span className="text-muted-foreground">{label}</span>
     <span className={accent ? "font-bold text-primary text-base" : "font-medium text-foreground"}>{value}</span>
@@ -170,7 +171,7 @@ const Deposit = () => {
         <div className="divide-y divide-border">
           <Row label="Order Number" value={order.orderNumber} />
           <Row label="Merchant" value={order.merchant} />
-          <Row label="Status" value={order.status} />
+          <Row label="Status" value={<StatusBadge status={order.status} />} />
           <Row label="Subtotal" value={`$${order.subtotal.toFixed(2)}`} />
           <Row label="Fee" value={`$${order.fee.toFixed(2)}`} />
           <Row label="Amount Due" value={`$${order.amountDue.toFixed(2)}`} accent />
