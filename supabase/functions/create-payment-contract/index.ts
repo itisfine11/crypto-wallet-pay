@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
       deposit_address: depositAddress,
       subtotal: order.subtotal,
       fee: order.fee,
+      fee_value: order.fee,
       amount_due: order.amountDue,
       expires_at: expiresAt,
     };
