@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { QRCodeImage } from "@/components/QRCodeImage";
 import { ArrowLeft, Copy, Check, Clock, Info, AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -12,6 +12,22 @@ import { supabase } from "@/integrations/supabase/client";
 
 const DEADLINE_SECONDS = 10 * 60;
 
+type DepositPageState = {
+  coin: Coin;
+  network: Network;
+  order: OrderInfo;
+  depositAddress: string;
+  expiresAt?: string;
+};
+
+const normalizeOrderStatus = (raw: unknown): OrderStatus => {
+  const normalized = String(raw ?? "").trim().toLowerCase();
+  if (normalized === "process" || normalized === "processing") return "Process";
+  if (normalized === "paid" || normalized === "success") return "Paid";
+  if (normalized === "expired") return "Expired";
+  return "Pending";
+};
+
 const Row = ({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) => (
   <div className="flex justify-between items-center py-2 text-sm">
     <span className="text-muted-foreground">{label}</span>
@@ -22,29 +38,123 @@ const Row = ({ label, value, accent }: { label: string; value: React.ReactNode; 
 const Deposit = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as {
-    coin: Coin;
-    network: Network;
-    order: OrderInfo;
-    depositAddress: string;
-  } | null;
+  const state = location.state as DepositPageState | null;
+  const orderIdFromQuery = useMemo(
+    () => new URLSearchParams(location.search).get("orderId"),
+    [location.search]
+  );
+
+  const [pageState, setPageState] = useState<DepositPageState | null>(state);
+  const [loadingOrder, setLoadingOrder] = useState(!state);
 
   useEffect(() => {
-    if (!state) navigate("/", { replace: true });
-  }, [state, navigate]);
+    if (state) {
+      setPageState(state);
+      setLoadingOrder(false);
+      return;
+    }
+    if (!orderIdFromQuery) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingOrder(true);
+    const bootstrapOrder = async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select(
+          "id, order_number, merchant, coin, network, deposit_address, status, subtotal, fee, amount_due, expires_at, payment_contract_id, tx_hash, confirmations"
+        )
+        .eq("id", orderIdFromQuery)
+        .single();
+
+      if (cancelled) return;
+      if (error || !data) {
+        toast.error("Order not found", { description: "Returning to start." });
+        navigate("/", { replace: true });
+        return;
+      }
+
+      setPageState({
+        coin: data.coin as Coin,
+        network: data.network as Network,
+        depositAddress: data.deposit_address,
+        expiresAt: data.expires_at,
+        order: {
+          id: data.id,
+          paymentContractId: data.payment_contract_id ?? undefined,
+          orderNumber: data.order_number,
+          merchant: data.merchant,
+          status: normalizeOrderStatus(data.status),
+          subtotal: Number(data.subtotal),
+          fee: Number(data.fee),
+          amountDue: Number(data.amount_due),
+        },
+      });
+      if (data.tx_hash) setTxHash(data.tx_hash);
+      if (typeof data.confirmations === "number") setConfirmations(data.confirmations);
+      setLoadingOrder(false);
+    };
+
+    void bootstrapOrder();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, orderIdFromQuery, state]);
 
   const [ack1, setAck1] = useState(false);
   const [ack2, setAck2] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(DEADLINE_SECONDS);
   const [copied, setCopied] = useState(false);
-  const [status, setStatus] = useState<OrderStatus>(state?.order.status ?? "Pending");
+  const [status, setStatus] = useState<OrderStatus>(pageState?.order.status ?? "Pending");
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [paymentContractId, setPaymentContractId] = useState<string | null>(
+    pageState?.order.paymentContractId ?? null
+  );
+  const [confirmations, setConfirmations] = useState<number>(0);
+  const lastNotifiedStatusRef = useRef<OrderStatus | null>(pageState?.order.status ?? null);
+  const hasShownWatcherErrorRef = useRef(false);
 
   const acknowledged = ack1 && ack2;
 
+  useEffect(() => {
+    if (!pageState) return;
+    setStatus(normalizeOrderStatus(pageState.order.status));
+    if (pageState.order.paymentContractId) {
+      setPaymentContractId(pageState.order.paymentContractId);
+    }
+  }, [pageState]);
+
+  const notifyStatusChange = useCallback((nextStatus: OrderStatus) => {
+    if (lastNotifiedStatusRef.current === nextStatus) return;
+    lastNotifiedStatusRef.current = nextStatus;
+
+    if (nextStatus === "Process") {
+      toast.info("Payment detected", {
+        description: "Waiting for network confirmations…",
+      });
+    } else if (nextStatus === "Paid") {
+      toast.success("Funds received!", {
+        description: "Your payment has been confirmed.",
+      });
+    } else if (nextStatus === "Expired") {
+      toast.error("Order expired");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!pageState?.expiresAt) return;
+    const expiresAtMs = new Date(pageState.expiresAt).getTime();
+    if (!Number.isFinite(expiresAtMs)) return;
+    const left = Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000));
+    setSecondsLeft(left);
+  }, [pageState?.expiresAt]);
+
   // Countdown timer (stops once Paid)
   useEffect(() => {
-    if (!acknowledged || status === "Paid") return;
+    if (!acknowledged || status === "Paid" || status === "Expired") return;
     const id = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
@@ -61,8 +171,8 @@ const Deposit = () => {
 
   // Realtime subscription on this order
   useEffect(() => {
-    if (!state?.order.id) return;
-    const orderId = state.order.id;
+    if (!pageState?.order.id) return;
+    const orderId = pageState.order.id;
 
     const channel = supabase
       .channel(`order-${orderId}`)
@@ -70,21 +180,17 @@ const Deposit = () => {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "orders", filter: `id=eq.${orderId}` },
         (payload) => {
-          const next = payload.new as { status: OrderStatus; tx_hash: string | null };
-          setStatus(next.status);
+          const next = payload.new as {
+            status: OrderStatus;
+            tx_hash: string | null;
+            payment_contract_id?: string | null;
+            confirmations?: number | null;
+          };
+          setStatus(normalizeOrderStatus(next.status));
           if (next.tx_hash) setTxHash(next.tx_hash);
-
-          if (next.status === "Process") {
-            toast.info("Payment detected", {
-              description: "Waiting for network confirmations…",
-            });
-          } else if (next.status === "Paid") {
-            toast.success("Funds received!", {
-              description: "Your payment has been confirmed.",
-            });
-          } else if (next.status === "Expired") {
-            toast.error("Order expired");
-          }
+          if (next.payment_contract_id) setPaymentContractId(next.payment_contract_id);
+          if (typeof next.confirmations === "number") setConfirmations(next.confirmations);
+          notifyStatusChange(normalizeOrderStatus(next.status));
         }
       )
       .subscribe();
@@ -92,26 +198,114 @@ const Deposit = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [state?.order.id]);
+  }, [notifyStatusChange, pageState?.order.id]);
+
+  // Keep status in sync even if realtime events were missed or delayed.
+  useEffect(() => {
+    if (!pageState?.order.id) return;
+    const orderId = pageState.order.id;
+
+    const syncOrderStatus = async (triggerWatcher: boolean) => {
+      if (triggerWatcher) {
+        try {
+          const { error: invokeError } = await supabase.functions.invoke("watch-payments");
+          if (invokeError) {
+            console.warn("watch-payments invoke failed:", invokeError.message);
+            if (!hasShownWatcherErrorRef.current) {
+              hasShownWatcherErrorRef.current = true;
+              toast.error("Live monitoring unavailable", {
+                description: "Could not reach watch-payments. Please check function deploy/secrets.",
+              });
+            }
+          } else {
+            hasShownWatcherErrorRef.current = false;
+          }
+        } catch (invokeErr) {
+          console.warn("watch-payments invoke threw:", invokeErr);
+          if (!hasShownWatcherErrorRef.current) {
+            hasShownWatcherErrorRef.current = true;
+            toast.error("Live monitoring unavailable", {
+              description: "Could not reach watch-payments. Please check function deploy/secrets.",
+            });
+          }
+        }
+      }
+
+      try {
+        const primaryQuery = await supabase
+          .from("orders")
+          .select("status, tx_hash, payment_contract_id, confirmations")
+          .eq("id", orderId)
+          .single();
+
+        let data = primaryQuery.data as
+          | {
+              status: string;
+              tx_hash: string | null;
+              payment_contract_id?: string | null;
+              confirmations?: number | null;
+            }
+          | null;
+        let error = primaryQuery.error;
+
+        if (error?.message?.includes("payment_contract_id")) {
+          const fallbackQuery = await supabase
+            .from("orders")
+            .select("status, tx_hash, confirmations")
+            .eq("id", orderId)
+            .single();
+          data = fallbackQuery.data as
+            | {
+                status: string;
+                tx_hash: string | null;
+                confirmations?: number | null;
+              }
+            | null;
+          error = fallbackQuery.error;
+        }
+
+        if (error || !data) return;
+
+        const nextStatus = normalizeOrderStatus(data.status);
+        setStatus(nextStatus);
+        if (data.tx_hash) setTxHash(data.tx_hash);
+        if (data.payment_contract_id) setPaymentContractId(data.payment_contract_id);
+        if (typeof data.confirmations === "number") setConfirmations(data.confirmations);
+        notifyStatusChange(nextStatus);
+      } catch (queryErr) {
+        console.warn("Order status sync failed:", queryErr);
+      }
+    };
+
+    void syncOrderStatus(true);
+    if (status === "Paid" || status === "Expired") return;
+
+    const intervalId = setInterval(() => {
+      void syncOrderStatus(true);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [notifyStatusChange, pageState?.order.id, status]);
 
   const mm = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
   const ss = String(secondsLeft % 60).padStart(2, "0");
 
   const coinName = useMemo(() => {
-    if (!state) return "";
-    return COINS.find((c) => c.id === state.coin)?.name ?? state.coin;
-  }, [state]);
+    if (!pageState) return "";
+    return COINS.find((c) => c.id === pageState.coin)?.name ?? pageState.coin;
+  }, [pageState]);
 
   const handleCopy = async () => {
-    if (!state) return;
-    await navigator.clipboard.writeText(state.depositAddress);
+    if (!pageState) return;
+    await navigator.clipboard.writeText(pageState.depositAddress);
     setCopied(true);
     toast.success("Address copied");
     setTimeout(() => setCopied(false), 1800);
   };
 
-  if (!state) return null;
-  const { coin, network, order, depositAddress } = state;
+  if (loadingOrder) return null;
+  if (!pageState) return null;
+  const { coin, network, order, depositAddress } = pageState;
   const isPaid = status === "Paid";
 
   return (
@@ -243,8 +437,10 @@ const Deposit = () => {
         <h2 className="font-semibold mb-2">Order Details</h2>
         <div className="divide-y divide-border">
           <Row label="Order Number" value={order.orderNumber} />
+          <Row label="Payment Contract" value={paymentContractId ?? "Creating..."} />
           <Row label="Merchant" value={order.merchant} />
           <Row label="Status" value={<StatusBadge status={status} />} />
+          <Row label="Confirmations" value={String(confirmations)} />
           <Row label="Subtotal" value={`$${order.subtotal.toFixed(2)}`} />
           <Row label="Fee" value={`$${order.fee.toFixed(2)}`} />
           <Row label="Amount Due" value={`$${order.amountDue.toFixed(6)}`} accent />

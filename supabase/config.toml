@@ -1,1 +1,10 @@
-project_id = "lsssxqfnxikynmjkcinq"
+project_id = "ukyqwqnmickftzmmxqns"
+
+[functions.create-payment-contract]
+verify_jwt = false
+
+[functions.watch-payments]
+verify_jwt = false
+
+[functions.ingest-payment-webhook]
+verify_jwt = false

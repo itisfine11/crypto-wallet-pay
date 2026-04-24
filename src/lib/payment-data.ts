@@ -13,6 +13,9 @@ export const NETWORKS: { id: Network; name: string; short: string; color: string
   { id: "Ethereum", name: "Ethereum", short: "ERC20", color: "#627EEA" },
 ];
 
+// Keep frontend choices aligned with networks monitored by watch-payments.
+export const TRACKED_NETWORKS: Network[] = ["BSC (BEP20)"];
+
 // Real merchant wallet (BSC). Other networks fall back to demo for now.
 export const WALLETS: Partial<Record<Network, string>> = {
   "BSC (BEP20)": "0x1Cc448AF59bfdB32aC79E6E40a4CEdC59D29a01D",
@@ -23,6 +26,7 @@ export type OrderStatus = "Pending" | "Process" | "Paid" | "Expired";
 
 export type OrderInfo = {
   id?: string;
+  paymentContractId?: string;
   orderNumber: string;
   merchant: string;
   status: OrderStatus;
@@ -37,11 +41,9 @@ export function generateOrder(): OrderInfo {
     Math.random().toString(36).slice(2, 6).toUpperCase() +
     "-" +
     Math.floor(1000 + Math.random() * 9000);
-  const subtotal = +(50 + Math.random() * 450).toFixed(2);
-  const fee = +(subtotal * 0.015).toFixed(2);
-  // Add a tiny random suffix so each order has a unique amount we can match on-chain
-  const uniqueSuffix = Math.floor(Math.random() * 9000 + 1000) / 1_000_000; // 0.001000–0.009999
-  const amountDue = +(subtotal + fee + uniqueSuffix).toFixed(6);
+  const subtotal = 1;
+  const fee = 0;
+  const amountDue = 1;
   return {
     orderNumber,
     merchant: "Lovable Crypto Store",

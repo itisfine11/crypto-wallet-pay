@@ -19,6 +19,7 @@ export type Database = {
           amount_due: number
           coin: string
           confirmations: number
+          contract_created_at: string
           created_at: string
           deposit_address: string
           expires_at: string
@@ -27,6 +28,8 @@ export type Database = {
           merchant: string
           network: string
           order_number: string
+          paid_at: string | null
+          payment_contract_id: string
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
           tx_hash: string | null
@@ -36,6 +39,7 @@ export type Database = {
           amount_due: number
           coin: string
           confirmations?: number
+          contract_created_at?: string
           created_at?: string
           deposit_address: string
           expires_at: string
@@ -44,6 +48,8 @@ export type Database = {
           merchant?: string
           network: string
           order_number: string
+          paid_at?: string | null
+          payment_contract_id?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal: number
           tx_hash?: string | null
@@ -53,6 +59,7 @@ export type Database = {
           amount_due?: number
           coin?: string
           confirmations?: number
+          contract_created_at?: string
           created_at?: string
           deposit_address?: string
           expires_at?: string
@@ -61,6 +68,8 @@ export type Database = {
           merchant?: string
           network?: string
           order_number?: string
+          paid_at?: string | null
+          payment_contract_id?: string
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
           tx_hash?: string | null

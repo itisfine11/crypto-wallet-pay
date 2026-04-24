@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Wallet, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PaymentModal } from "@/components/PaymentModal";
-import { generateOrder, WALLETS, DEMO_ADDRESS, type Coin, type Network } from "@/lib/payment-data";
+import { generateOrder, type Coin, type Network } from "@/lib/payment-data";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -15,38 +15,45 @@ const Index = () => {
 
   const handleProceed = async (coin: Coin, network: Network) => {
     setCreating(true);
-    const depositAddress = WALLETS[network] ?? DEMO_ADDRESS;
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-    const { data, error } = await supabase
-      .from("orders")
-      .insert({
-        order_number: order.orderNumber,
-        merchant: order.merchant,
+    const { data, error } = await supabase.functions.invoke("create-payment-contract", {
+      body: {
         coin,
         network,
-        deposit_address: depositAddress,
-        subtotal: order.subtotal,
-        fee: order.fee,
-        amount_due: order.amountDue,
-        expires_at: expiresAt,
-      })
-      .select()
-      .single();
+        order: {
+          orderNumber: order.orderNumber,
+          merchant: order.merchant,
+          subtotal: order.subtotal,
+          fee: order.fee,
+          amountDue: order.amountDue,
+        },
+      },
+    });
 
     setCreating(false);
 
     if (error || !data) {
-      toast.error("Failed to create order", { description: error?.message });
+      toast.error("Failed to create payment contract", { description: error?.message });
       return;
     }
 
+    const orderId = String(data.orderId ?? "");
+    const depositAddress = String(data.depositAddress ?? "");
+    const paymentContractId = String(data.paymentContractId ?? "");
+    if (!orderId || !depositAddress || !paymentContractId) {
+      toast.error("Invalid payment contract response");
+      return;
+    }
+
+    toast.success("Payment contract created", {
+      description: "Monitoring starts now and you will be notified on confirmation.",
+    });
+
     setOpen(false);
-    navigate("/deposit", {
+    navigate(`/deposit?orderId=${encodeURIComponent(orderId)}`, {
       state: {
         coin,
         network,
-        order: { ...order, id: data.id },
+        order: { ...order, id: orderId, paymentContractId },
         depositAddress,
       },
     });
@@ -63,7 +70,7 @@ const Index = () => {
           Crypto Payment <span className="bg-gradient-primary bg-clip-text text-transparent">Tracker</span>
         </h1>
         <p className="text-muted-foreground mb-8">
-          Securely pay your order with USDT or USDC across major networks.
+          Securely pay your order with USDT or USDC on BSC (BEP20) with live tracking.
         </p>
 
         <div className="bg-gradient-card border border-border rounded-2xl p-6 shadow-card mb-6 text-left">

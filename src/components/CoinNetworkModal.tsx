@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Check } from "lucide-react";
-import { COINS, NETWORKS, type Coin, type Network } from "@/lib/payment-data";
+import { COINS, NETWORKS, TRACKED_NETWORKS, type Coin, type Network } from "@/lib/payment-data";
 import { CoinIcon, NetworkBadge } from "./CoinIcon";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ type Props = {
 export const CoinNetworkModal = ({ open, onOpenChange, onConfirm, initialCoin, initialNetwork }: Props) => {
   const [coin, setCoin] = useState<Coin | undefined>(initialCoin);
   const [network, setNetwork] = useState<Network | undefined>(initialNetwork);
+  const availableNetworks = NETWORKS.filter((n) => TRACKED_NETWORKS.includes(n.id));
 
   const canConfirm = coin && network;
 
@@ -56,7 +57,7 @@ export const CoinNetworkModal = ({ open, onOpenChange, onConfirm, initialCoin, i
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Network</p>
             <div className="space-y-2">
-              {NETWORKS.map((n) => (
+              {availableNetworks.map((n) => (
                 <button
                   key={n.id}
                   onClick={() => setNetwork(n.id)}
@@ -76,6 +77,9 @@ export const CoinNetworkModal = ({ open, onOpenChange, onConfirm, initialCoin, i
                 </button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Live payment tracking is currently available on BSC (BEP20).
+            </p>
           </div>
 
           <Button
